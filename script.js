@@ -218,12 +218,43 @@ async function loadConstellations() {
   console.log("loaded constellation paths:", constellationLines.length);
 }
 
-  function magToSize(mag) {
+function magToSize(mag) {
     // brightest stars big, faint ones tiny, exponential-ish falloff
     // mag -1.5 (Sirius) -> large, mag 4 -> very small
     const size = 1.5 * Math.pow(2.512, (1 - mag) * 0.4);
     return Math.max(0.15, Math.min(size, 4)); // clamp so nothing's absurd
   }
+
+function startAR() {
+    // iOS 13+ requires explicit permission, requested from a user gesture
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(state => {
+          if (state === 'granted') {
+            window.addEventListener('deviceorientation', onOrientation);
+          } else {
+            alert('Orientation permission denied');
+          }
+        })
+        .catch(err => alert('Orientation error: ' + err));
+    } else {
+      // Android / others: no explicit permission needed
+      window.addEventListener('deviceorientation', onOrientation);
+    }
+  }
+  
+  function onOrientation(event) {
+    // alpha = compass heading (0-360), beta = front-back tilt, gamma = left-right tilt
+    const a = event.alpha, b = event.beta, g = event.gamma;
+    console.log('alpha', a?.toFixed(1), 'beta', b?.toFixed(1), 'gamma', g?.toFixed(1));
+  }
+  document.getElementById('arBtn').addEventListener('click', startAR);
+
+
+
+
+
 
 loadStars();
 loadConstellations();

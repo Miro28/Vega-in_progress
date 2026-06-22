@@ -265,7 +265,7 @@ async function startCamera() {
     video.style.width = '100vw';
     video.style.height = '100vh';
     video.style.objectFit = 'contain';
-    video.style.zIndex = '-2';  // behind the canvas (canvas is -1)
+    video.style.zIndex = '-2';
     document.body.appendChild(video);
   
     try {
@@ -316,24 +316,19 @@ function onOrientation(event) {
 
 function calibrateOnMoon() {
     if (!currentObserver) { alert('Find location first'); return; }
-  
     const time = new Date();
     const equ = Astronomy.Equator(Astronomy.Body.Moon, time, currentObserver, true, true);
     const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
   
-    // where the app currently draws the Moon, in 3D:
-    const moonPos = altAzToVector(hor.altitude, hor.azimuth);
-  
-    // project it to screen to see how far horizontally it is from center:
-    const projected = moonPos.clone().project(camera); // gives x,y in -1..1, center = 0
-    // projected.x = 0 means it's already on the crosshair horizontally
-  
-    // convert that horizontal screen offset into a heading correction.
-    // camera FOV horizontally spans roughly fov*aspect; map screen-x to degrees:
-    const halfHFovDeg = (camera.fov * camera.aspect) / 2;
-    const correctionDeg = projected.x * halfHFovDeg;
-  
-    headingOffset += correctionDeg;
+    // iterate: nudge headingOffset until the projected Moon's screen-x hits center (0)
+    for (let i = 0; i < 60; i++) {
+      const moonPos = altAzToVector(hor.altitude, hor.azimuth);
+      const p = moonPos.clone().project(camera);   // p.x in -1..1, 0 = crosshair
+      if (Math.abs(p.x) < 0.005) break;             // close enough to center
+      // if behind camera, project flips; push hard in one direction
+      const step = (p.z > 1) ? 2 : p.x * 30;        // degrees to nudge
+      headingOffset += step;
+    }
   }
     
 document.getElementById('findBtn').addEventListener('click', FindLocation);

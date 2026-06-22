@@ -5,6 +5,10 @@ let headingOffset = 0;  // correction applied to compass heading
 let currentObserver = null;  // so calibrate can access location
 let arActive = false;
 let deviceAngles = { alpha: 0, beta: 0, gamma: 0 };
+const zee = new THREE.Vector3(0, 0, 1);
+const q0 = new THREE.Quaternion();
+const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90° around X
+const tmpEuler = new THREE.Euler();
 
 let scene, camera, renderer;
 let stars = [];
@@ -112,22 +116,29 @@ function startScene(){
         requestAnimationFrame(animate);
       
         if (arActive) {
-          const deg2rad = Math.PI / 180;
-          const alpha = deviceAngles.alpha * deg2rad;
-          const beta  = deviceAngles.beta  * deg2rad;
-          const gamma = deviceAngles.gamma * deg2rad;
-      
-          const euler = new THREE.Euler();
-          euler.set(beta, alpha, -gamma, 'YXZ');  // device orientation order
-          camera.quaternion.setFromEuler(euler);
+          setCameraFromDevice();
         } else {
-          controls.update();   // drag controls only when not in AR
+          controls.update();
         }
-      
         renderer.render(scene, camera);
       }
     animate();
 
+}
+
+
+
+function setCameraFromDevice() {
+  const deg2rad = Math.PI / 180;
+  const alpha = (deviceAngles.alpha) * deg2rad; // z
+  const beta  = (deviceAngles.beta)  * deg2rad; // x
+  const gamma = (deviceAngles.gamma) * deg2rad; // y
+  const orient = (screen.orientation?.angle || 0) * deg2rad; // screen rotation
+
+  tmpEuler.set(beta, alpha, -gamma, 'YXZ');
+  camera.quaternion.setFromEuler(tmpEuler);
+  camera.quaternion.multiply(q1);                          // camera looks out the back
+  camera.quaternion.multiply(q0.setFromAxisAngle(zee, -orient)); // adjust for screen rotation
 }
 
 function plotStars(stars, observer, time) {

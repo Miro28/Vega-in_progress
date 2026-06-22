@@ -122,7 +122,6 @@ function plotStars(stars, observer, time) {
       const pos = altAzToVector(hor.altitude, hor.azimuth);
   
       const size = magToSize(star.mag);
-      console.log(star.name, star.mag, size);  // temporary
       const geometry = new THREE.SphereGeometry(size, 6, 6);
       const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const dot = new THREE.Mesh(geometry, material);

@@ -363,38 +363,43 @@ function calibrateOnMoon() {
 }
     
 async function initializeApp() {
-    const startBtn = document.getElementById('startAppBtn');
-    startBtn.textContent = "Connecting Sensors...";
-    startBtn.style.pointerEvents = "none"; 
+    // 1. HARD REMOVAL: Hide the overlay immediately.
+    // It is gone. It cannot block the screen anymore.
+    const overlay = document.getElementById('introOverlay');
+    overlay.style.display = 'none'; 
+    overlay.style.opacity = '0';
 
-    // 1. Request Orientation FIRST (iOS requires this to happen instantly after the tap)
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-            const state = await DeviceOrientationEvent.requestPermission();
-            if (state !== 'granted') {
-                alert('Orientation permission denied. App cannot function.');
-                startBtn.textContent = "Permission Denied";
-                return; // Stop execution
-            }
-        } catch (err) {
-            console.warn("Orientation request error:", err);
-        }
-    }
-
-    // 2. Request Fullscreen (Do NOT await this, it can stall the thread)
+    // 2. We trigger the sensors as individual "fire-and-forget" tasks
+    // If one fails, the app still runs and the overlay is already gone.
+    
+    // Attempt Fullscreen
     if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(e => console.warn("Fullscreen blocked by browser"));
+        document.documentElement.requestFullscreen().catch(() => {});
     }
 
-    // 3. Kick off Location request (Runs in background)
+    // Attempt Orientation
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(state => {
+                if (state === 'granted') window.addEventListener('deviceorientation', onOrientation);
+            })
+            .catch(console.error);
+    } else {
+        window.addEventListener('deviceorientation', onOrientation);
+    }
+
+    // Attempt Camera
+    startCamera();
+
+    // Attempt Location
     FindLocation();
 
-    // 4. Request Camera safely
-    await startCamera();
-    
-    // 5. If we survived the gauntlet, attach listeners and launch the AR view!
-    window.addEventListener('deviceorientation', onOrientation);
-    transitionToAR();
+    // 3. FORCE SHOW the AR UI
+    const arUI = document.getElementById('arUI');
+    if (arUI) {
+        arUI.classList.remove('hidden');
+        arUI.style.opacity = '1';
+    }
 }
 
 // Modify your existing onOrientation function slightly to call updateHUD:

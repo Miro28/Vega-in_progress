@@ -244,12 +244,14 @@ function startAR() {
     }
   }
   
+  let orientationCount = 0;
   function onOrientation(event) {
+    orientationCount++;
     const a = event.alpha, b = event.beta, g = event.gamma;
     document.getElementById('arReadout').textContent =
-      `alpha ${a?.toFixed(1)}  beta ${b?.toFixed(1)}  gamma ${g?.toFixed(1)}`;
-  }
-  document.getElementById('arBtn').addEventListener('click', startAR);
+        `#${orientationCount}  alpha ${a?.toFixed(1)}  beta ${b?.toFixed(1)}  gamma ${g?.toFixed(1)}`;
+    }
+    document.getElementById('arBtn').addEventListener('click', startAR);
 
 
 

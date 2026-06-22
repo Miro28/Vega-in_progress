@@ -265,18 +265,19 @@ function magToSize(mag) {
   async function startCamera() {
     const video = document.createElement('video');
     video.setAttribute('playsinline', '');
+    video.setAttribute('autoplay', '');
+    video.setAttribute('muted', ''); // CRITICAL: Mobile browsers block unmuted camera autoplay
+    video.muted = true;
     
-    // Let CSS handle the aspect ratio flawlessly
     video.style.position = 'fixed';
     video.style.top = '0';
     video.style.left = '0';
     video.style.width = '100vw';
     video.style.height = '100vh';
     video.style.objectFit = 'cover'; 
-    video.style.zIndex = '-2';
+    video.style.zIndex = '1'; // Sits above the black background, below the canvas
     document.body.appendChild(video);
 
-    // Request Portrait vs Landscape resolution dynamically to prevent extreme cropping
     const isPortrait = window.innerHeight > window.innerWidth;
     const idealWidth = isPortrait ? 1080 : 1920;
     const idealHeight = isPortrait ? 1920 : 1080;
@@ -357,12 +358,21 @@ function calibrateOnMoon() {
 async function initializeApp() {
     const startBtn = document.getElementById('startAppBtn');
     startBtn.textContent = "Connecting Sensors...";
-    startBtn.style.pointerEvents = "none"; // prevent double click
+    startBtn.style.pointerEvents = "none"; 
 
-    // 1. Kick off Location request
+    // 1. Request Fullscreen automatically
+    if (document.documentElement.requestFullscreen) {
+        try {
+            await document.documentElement.requestFullscreen();
+        } catch (err) {
+            console.warn("Fullscreen request denied or not supported by this browser.");
+        }
+    }
+
+    // 2. Kick off Location request
     FindLocation();
 
-    // 2. Request Camera and Orientation permissions
+    // 3. Request Camera and Orientation permissions
     await startCamera();
     
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -383,27 +393,6 @@ async function initializeApp() {
         // Android / Non-iOS path
         window.addEventListener('deviceorientation', onOrientation);
         transitionToAR();
-    }
-}
-
-function transitionToAR() {
-    const overlay = document.getElementById('introOverlay');
-    const arUI = document.getElementById('arUI');
-
-    // Fade out overlay
-    overlay.style.opacity = '0';
-    setTimeout(() => {
-        overlay.style.display = 'none';
-        // Fade in HUD
-        arUI.classList.remove('hidden');
-    }, 600); // Wait for CSS transition to finish
-}
-
-// Format the HUD readout to look cleaner
-function updateHUD(alpha, beta, gamma) {
-    const readout = document.getElementById('arReadout');
-    if(readout) {
-        readout.innerHTML = `HDG: ${alpha.toFixed(1)}&deg;<br>PIT: ${beta.toFixed(1)}&deg;<br>ROL: ${gamma.toFixed(1)}&deg;`;
     }
 }
 

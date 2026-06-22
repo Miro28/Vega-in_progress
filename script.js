@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+let headingOffset = 0;  // correction applied to compass heading
+let currentObserver = null;  // so calibrate can access location
 let arActive = false;
 let deviceAngles = { alpha: 0, beta: 0, gamma: 0 };
 
@@ -24,6 +27,7 @@ function FindLocation() {
         const latitude = position.coords.latitude;
         const longitude = position.coords.longitude;
         const observer = new Astronomy.Observer(latitude, longitude, 0);
+        currentObserver = observer;
         const time = new Date();
         clearSky();
         plotStars(stars, observer, time);
@@ -260,7 +264,7 @@ function startAR() {
 
 function onOrientation(event) {
   if (event.alpha === null) return;
-  deviceAngles.alpha = event.alpha;
+  deviceAngles.alpha = event.alpha - headingOffset;
   deviceAngles.beta  = event.beta;
   deviceAngles.gamma = event.gamma;
   arActive = true;
@@ -268,9 +272,28 @@ function onOrientation(event) {
   document.getElementById('arReadout').textContent =
     `a${event.alpha.toFixed(0)} b${event.beta.toFixed(0)} g${event.gamma.toFixed(0)}`;
 }
+
+function calibrateOnMoon() {
+    if (!currentObserver) { alert('Find location first'); return; }
+  
+    const time = new Date();
+    // where the Moon really is:
+    const equ = Astronomy.Equator(Astronomy.Body.Moon, time, currentObserver, true, true);
+    const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
+    const moonAzimuth = hor.azimuth;   // true compass bearing of the Moon
+  
+    // what the phone currently thinks it's pointing at (raw alpha, before offset):
+    const rawHeading = deviceAngles.alpha + headingOffset; // undo current offset to get raw
+  
+    // the offset is the difference: how far the phone's heading is from reality
+    headingOffset = rawHeading - moonAzimuth;
+  
+    alert(`Calibrated. Moon az ${moonAzimuth.toFixed(0)}, offset ${headingOffset.toFixed(0)}`);
+  }
     
 document.getElementById('findBtn').addEventListener('click', FindLocation);
 document.getElementById('arBtn').addEventListener('click', startAR);
+document.getElementById('calBtn').addEventListener('click', calibrateOnMoon);
 
 loadStars();
 loadConstellations();

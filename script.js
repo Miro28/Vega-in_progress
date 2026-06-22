@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+
 let headingOffset = 0;  // correction applied to compass heading
 let currentObserver = null;  // so calibrate can access location
 let arActive = false;
@@ -10,7 +11,7 @@ const q0 = new THREE.Quaternion();
 const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90° around X
 const tmpEuler = new THREE.Euler();
 
-let scene, camera, renderer;
+let scene, camera, renderer, controls;
 let stars = [];
 
 function FindLocation() {

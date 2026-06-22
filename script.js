@@ -101,32 +101,30 @@ function showStars(latitude, longitude) {
     return new THREE.Vector3(x, y, z);
   }
 
-function startScene(){
+  function startScene(){
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    renderer = new THREE.WebGLRenderer();
-    const controls = new OrbitControls(camera, renderer.domElement);
     renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setClearColor(0x000000, 0); // transparent background
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-    camera.position.set(0, 0, 0.1);   // basically at center
-    controls.target.set(0, 0, 0);     // look toward center
-    controls.rotateSpeed = -0.3;       // negative makes drag feel natural (like looking around)
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    camera.position.set(0, 0, 0.1);
+    controls.target.set(0, 0, 0);
+    controls.rotateSpeed = -0.3;
 
     function animate() {
         requestAnimationFrame(animate);
-      
         if (arActive) {
           setCameraFromDevice();
         } else {
           controls.update();
         }
         renderer.render(scene, camera);
-      }
+    }
     animate();
-
 }
 
 
@@ -256,33 +254,28 @@ function magToSize(mag) {
     const size = 1.5 * Math.pow(2.512, (1 - mag) * 0.4);
     return Math.max(0.15, Math.min(size, 4)); // clamp so nothing's absurd
   }
-async function startCamera() {
+  async function startCamera() {
     const video = document.createElement('video');
-    video.setAttribute('playsinline', '');  // needed for iOS/mobile
+    video.setAttribute('playsinline', '');
     video.style.position = 'fixed';
-    video.style.top = '0';
-    video.style.left = '0';
-    video.style.width = '100vw';
-    video.style.height = '100vh';
-    video.style.objectFit = 'contain';
+    video.style.top = '50%';
+    video.style.left = '50%';
+    video.style.transform = 'translate(-50%, -50%)';
+    video.style.maxWidth = '100vw';
+    video.style.maxHeight = '100vh';
     video.style.zIndex = '-2';
     document.body.appendChild(video);
-  
+
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'environment',
-              width:  { ideal: 1920 },
-              height: { ideal: 1080 }
-            }
-          });
-      video.srcObject = stream;
-      await video.play();
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        });
+        video.srcObject = stream;
+        await video.play();
     } catch (err) {
-      alert('Camera error: ' + err);
+        alert('Camera error: ' + err);
     }
-  }
-
+}
 function startAR() {
     startCamera();
     alert('Start AR running');   // proves the button fired
@@ -316,19 +309,29 @@ function onOrientation(event) {
 
 function calibrateOnMoon() {
     if (!currentObserver) { alert('Find location first'); return; }
+  
+    // make sure the camera reflects the CURRENT device orientation right now
+    setCameraFromDevice();
+  
+    // true position of the Moon
     const time = new Date();
     const equ = Astronomy.Equator(Astronomy.Body.Moon, time, currentObserver, true, true);
     const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
+    const moonAz = hor.azimuth;
   
-    // iterate: nudge headingOffset until the projected Moon's screen-x hits center (0)
-    for (let i = 0; i < 60; i++) {
-      const moonPos = altAzToVector(hor.altitude, hor.azimuth);
-      const p = moonPos.clone().project(camera);   // p.x in -1..1, 0 = crosshair
-      if (Math.abs(p.x) < 0.005) break;             // close enough to center
-      // if behind camera, project flips; push hard in one direction
-      const step = (p.z > 1) ? 2 : p.x * 30;        // degrees to nudge
-      headingOffset += step;
-    }
+    // where the camera (crosshair / screen center) actually points, in world space
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    let crossAz = Math.atan2(dir.x, -dir.z) * 180 / Math.PI;
+    if (crossAz < 0) crossAz += 360;
+  
+    // we want the crosshair to point where the Moon is.
+    // crossAz currently includes the effect of headingOffset (via deviceAngles.alpha).
+    // shift headingOffset by the gap, taking the short way around.
+    let diff = crossAz - moonAz;
+    while (diff > 180) diff -= 360;
+    while (diff < -180) diff += 360;
+    headingOffset += diff;
   }
     
 document.getElementById('findBtn').addEventListener('click', FindLocation);

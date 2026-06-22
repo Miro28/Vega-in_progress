@@ -226,7 +226,7 @@ function magToSize(mag) {
   }
 
 function startAR() {
-    // iOS 13+ requires explicit permission, requested from a user gesture
+    alert('Start AR running');   // proves the button fired
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission()
@@ -239,21 +239,22 @@ function startAR() {
         })
         .catch(err => alert('Orientation error: ' + err));
     } else {
-      // Android / others: no explicit permission needed
       window.addEventListener('deviceorientation', onOrientation);
+      alert('Listener attached (Android path)');  // proves we reached here
     }
-  }
+}
   
-  let orientationCount = 0;
-  function onOrientation(event) {
+let orientationCount = 0;
+function onOrientation(event) {
     orientationCount++;
     const a = event.alpha, b = event.beta, g = event.gamma;
     document.getElementById('arReadout').textContent =
-        `#${orientationCount}  alpha ${a?.toFixed(1)}  beta ${b?.toFixed(1)}  gamma ${g?.toFixed(1)}`;
-    }
+      `#${orientationCount}  alpha ${a?.toFixed(1)}  beta ${b?.toFixed(1)}  gamma ${g?.toFixed(1)}`;
+}
+    
+window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('arBtn').addEventListener('click', startAR);
-
-
+});
 
 
 

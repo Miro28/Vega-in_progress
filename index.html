@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VEGA AR STAR MAP</title>
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/astronomy-engine/astronomy.browser.min.js"></script>
     <script type="importmap">
         {
@@ -14,26 +15,35 @@
         }
     </script>
 </head>
-
 <body>
-        <button id="findBtn">Find My Location</button>
-        <button id="arBtn">Start AR</button>
-        <button id="calBtn">Calibrate on Moon</button>
-        <div id="crosshair" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:red; font-size:30px; z-index:11; pointer-events:none;">+</div>
-        <div id="arReadout" style="position:fixed; top:50px; left:10px; color:lime; z-index:10; font-family:monospace;"></div>
-        <script type="module" src="script.js"></script>
+
+    <div id="introOverlay">
+        <div class="intro-content">
+            <h1>VEGA</h1>
+            <p>Astrometry & Augmented Reality</p>
+            <button id="startAppBtn" class="primary-btn">Initialize System</button>
+        </div>
+    </div>
+
+    <div id="arUI" class="hidden">
+        <div id="hudTop">
+            <div id="arReadout">Awaiting telemetry...</div>
+        </div>
+        
+        <div id="crosshair">
+            <div class="reticle"></div>
+        </div>
+
+        <div id="hudBottom">
+            <button id="calBtn" class="hud-btn">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                Sync to Moon
+            </button>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
 </body>
-
-<style>
-  body { margin: 0; }
-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -1;
-}
-</style>
-
 </html>

@@ -297,7 +297,6 @@ function magToSize(mag) {
 }
 function startAR() {
     startCamera();
-    alert('Start AR running');   // proves the button fired
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission()
@@ -311,7 +310,6 @@ function startAR() {
         .catch(err => alert('Orientation error: ' + err));
     } else {
       window.addEventListener('deviceorientation', onOrientation);
-      alert('Listener attached (Android path)');  // proves we reached here
     }
 }
 
@@ -354,10 +352,70 @@ function calibrateOnMoon() {
     setCameraFromDevice();
 }
     
-document.getElementById('findBtn').addEventListener('click', FindLocation);
-document.getElementById('arBtn').addEventListener('click', startAR);
+// --- NEW INITIALIZATION LOGIC ---
+
+async function initializeApp() {
+    const startBtn = document.getElementById('startAppBtn');
+    startBtn.textContent = "Connecting Sensors...";
+    startBtn.style.pointerEvents = "none"; // prevent double click
+
+    // 1. Kick off Location request
+    FindLocation();
+
+    // 2. Request Camera and Orientation permissions
+    await startCamera();
+    
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+            const state = await DeviceOrientationEvent.requestPermission();
+            if (state === 'granted') {
+                window.addEventListener('deviceorientation', onOrientation);
+                transitionToAR();
+            } else {
+                alert('Orientation permission denied. App cannot function.');
+                startBtn.textContent = "Permission Denied";
+            }
+        } catch (err) {
+            alert('Orientation error: ' + err);
+            startBtn.textContent = "Error";
+        }
+    } else {
+        // Android / Non-iOS path
+        window.addEventListener('deviceorientation', onOrientation);
+        transitionToAR();
+    }
+}
+
+function transitionToAR() {
+    const overlay = document.getElementById('introOverlay');
+    const arUI = document.getElementById('arUI');
+
+    // Fade out overlay
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+        overlay.style.display = 'none';
+        // Fade in HUD
+        arUI.classList.remove('hidden');
+    }, 600); // Wait for CSS transition to finish
+}
+
+// Format the HUD readout to look cleaner
+function updateHUD(alpha, beta, gamma) {
+    const readout = document.getElementById('arReadout');
+    if(readout) {
+        readout.innerHTML = `HDG: ${alpha.toFixed(1)}&deg;<br>PIT: ${beta.toFixed(1)}&deg;<br>ROL: ${gamma.toFixed(1)}&deg;`;
+    }
+}
+
+// Modify your existing onOrientation function slightly to call updateHUD:
+// Add this line inside onOrientation: 
+// updateHUD(event.alpha, event.beta, event.gamma);
+
+// --- EVENT LISTENERS ---
+document.getElementById('startAppBtn').addEventListener('click', initializeApp);
 document.getElementById('calBtn').addEventListener('click', calibrateOnMoon);
 
+// Start background loads
 loadStars();
 loadConstellations();
 startScene();

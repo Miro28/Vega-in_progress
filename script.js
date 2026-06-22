@@ -262,7 +262,7 @@ async function startCamera() {
     video.style.left = '0';
     video.style.width = '100vw';
     video.style.height = '100vh';
-    video.style.objectFit = 'cover';
+    video.style.objectFit = 'contain';
     video.style.zIndex = '-2';  // behind the canvas (canvas is -1)
     document.body.appendChild(video);
   
@@ -320,17 +320,18 @@ function calibrateOnMoon() {
     const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
     const moonAz = hor.azimuth;
   
-    // direction the camera (crosshair) is pointing, in world space
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    let camAz = Math.atan2(dir.x, -dir.z) * 180 / Math.PI;
-    if (camAz < 0) camAz += 360;
+    // raw heading the phone reports right now (before any offset)
+    const rawAlpha = deviceAngles.alpha + headingOffset; // undo current offset to get raw sensor
   
-    // make the app agree that the crosshair direction = the Moon
-    let diff = camAz - moonAz;
-    while (diff > 180) diff -= 360;
-    while (diff < -180) diff += 360;
-    headingOffset += diff;
+    // we want: when phone points at this raw heading, the sky shows the Moon's azimuth.
+    // the app computes positions using (rawAlpha - headingOffset) as heading.
+    // so set headingOffset such that (rawAlpha - headingOffset) maps to moonAz.
+    // the camera's shown azimuth = rawAlpha - headingOffset; we want that = moonAz
+    headingOffset = rawAlpha - moonAz;
+  
+    // normalize
+    while (headingOffset > 180) headingOffset -= 360;
+    while (headingOffset < -180) headingOffset += 360;
   }
     
 document.getElementById('findBtn').addEventListener('click', FindLocation);

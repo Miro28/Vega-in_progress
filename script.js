@@ -320,20 +320,20 @@ function calibrateOnMoon() {
     const time = new Date();
     const equ = Astronomy.Equator(Astronomy.Body.Moon, time, currentObserver, true, true);
     const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
-    const moonAz = hor.azimuth;
   
-    // EXACT direction the crosshair (screen center) points:
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    let crossAz = Math.atan2(dir.x, -dir.z) * 180 / Math.PI;
-    if (crossAz < 0) crossAz += 360;
+    // where the app currently draws the Moon, in 3D:
+    const moonPos = altAzToVector(hor.altitude, hor.azimuth);
   
-    // currently the crosshair shows crossAz. we want it to show moonAz.
-    // shift the offset by exactly that gap.
-    let diff = crossAz - moonAz;
-    while (diff > 180) diff -= 360;
-    while (diff < -180) diff += 360;
-    headingOffset += diff;
+    // project it to screen to see how far horizontally it is from center:
+    const projected = moonPos.clone().project(camera); // gives x,y in -1..1, center = 0
+    // projected.x = 0 means it's already on the crosshair horizontally
+  
+    // convert that horizontal screen offset into a heading correction.
+    // camera FOV horizontally spans roughly fov*aspect; map screen-x to degrees:
+    const halfHFovDeg = (camera.fov * camera.aspect) / 2;
+    const correctionDeg = projected.x * halfHFovDeg;
+  
+    headingOffset += correctionDeg;
   }
     
 document.getElementById('findBtn').addEventListener('click', FindLocation);

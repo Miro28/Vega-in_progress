@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+let arActive = false;
+let deviceAngles = { alpha: 0, beta: 0, gamma: 0 };
 
 let scene, camera, renderer;
 let stars = [];
@@ -104,9 +106,22 @@ function startScene(){
 
     function animate() {
         requestAnimationFrame(animate);
+      
+        if (arActive) {
+          const deg2rad = Math.PI / 180;
+          const alpha = deviceAngles.alpha * deg2rad;
+          const beta  = deviceAngles.beta  * deg2rad;
+          const gamma = deviceAngles.gamma * deg2rad;
+      
+          const euler = new THREE.Euler();
+          euler.set(beta, alpha, -gamma, 'YXZ');  // device orientation order
+          camera.quaternion.setFromEuler(euler);
+        } else {
+          controls.update();   // drag controls only when not in AR
+        }
+      
         renderer.render(scene, camera);
-        controls.update();
-    }
+      }
     animate();
 
 }
@@ -242,13 +257,16 @@ function startAR() {
       alert('Listener attached (Android path)');  // proves we reached here
     }
 }
-  
-let orientationCount = 0;
+
 function onOrientation(event) {
-    orientationCount++;
-    const a = event.alpha, b = event.beta, g = event.gamma;
-    document.getElementById('arReadout').textContent =
-      `#${orientationCount}  alpha ${a?.toFixed(1)}  beta ${b?.toFixed(1)}  gamma ${g?.toFixed(1)}`;
+  if (event.alpha === null) return;
+  deviceAngles.alpha = event.alpha;
+  deviceAngles.beta  = event.beta;
+  deviceAngles.gamma = event.gamma;
+  arActive = true;
+  // keep the readout for now while testing
+  document.getElementById('arReadout').textContent =
+    `a${event.alpha.toFixed(0)} b${event.beta.toFixed(0)} g${event.gamma.toFixed(0)}`;
 }
     
 document.getElementById('findBtn').addEventListener('click', FindLocation);

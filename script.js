@@ -6,9 +6,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer, controls;
 let stars = [];
-let starPoints = null;          // THREE.Points object holding all stars
+let starPoints = null;
 let plottedStars = [];          // { name, position } for identification
-let constellationLines = [];
+let constellationGroups = [];   // { id, name, paths, lines }
 let currentObserver = null;
 
 let arActive = false;
@@ -25,6 +25,27 @@ const tmpEuler = new THREE.Euler();
 
 const tmpVec = new THREE.Vector3();
 const camDir = new THREE.Vector3();
+
+const CONSTELLATION_NAMES = {
+  And:'Andromeda', Ant:'Antlia', Aps:'Apus', Aqr:'Aquarius', Aql:'Aquila',
+  Ara:'Ara', Ari:'Aries', Aur:'Auriga', Boo:'Bootes', Cae:'Caelum',
+  Cam:'Camelopardalis', Cnc:'Cancer', CVn:'Canes Venatici', CMa:'Canis Major',
+  CMi:'Canis Minor', Cap:'Capricornus', Car:'Carina', Cas:'Cassiopeia',
+  Cen:'Centaurus', Cep:'Cepheus', Cet:'Cetus', Cha:'Chamaeleon', Cir:'Circinus',
+  Col:'Columba', Com:'Coma Berenices', CrA:'Corona Australis', CrB:'Corona Borealis',
+  Crv:'Corvus', Crt:'Crater', Cru:'Crux', Cyg:'Cygnus', Del:'Delphinus',
+  Dor:'Dorado', Dra:'Draco', Equ:'Equuleus', Eri:'Eridanus', For:'Fornax',
+  Gem:'Gemini', Gru:'Grus', Her:'Hercules', Hor:'Horologium', Hya:'Hydra',
+  Hyi:'Hydrus', Ind:'Indus', Lac:'Lacerta', Leo:'Leo', LMi:'Leo Minor',
+  Lep:'Lepus', Lib:'Libra', Lup:'Lupus', Lyn:'Lynx', Lyr:'Lyra', Men:'Mensa',
+  Mic:'Microscopium', Mon:'Monoceros', Mus:'Musca', Nor:'Norma', Oct:'Octans',
+  Oph:'Ophiuchus', Ori:'Orion', Pav:'Pavo', Peg:'Pegasus', Per:'Perseus',
+  Phe:'Phoenix', Pic:'Pictor', Psc:'Pisces', PsA:'Piscis Austrinus', Pup:'Puppis',
+  Pyx:'Pyxis', Ret:'Reticulum', Sge:'Sagitta', Sgr:'Sagittarius', Sco:'Scorpius',
+  Scl:'Sculptor', Sct:'Scutum', Ser:'Serpens', Sex:'Sextans', Tau:'Taurus',
+  Tel:'Telescopium', Tri:'Triangulum', TrA:'Triangulum Australe', Tuc:'Tucana',
+  UMa:'Ursa Major', UMi:'Ursa Minor', Vel:'Vela', Vir:'Virgo', Vol:'Volans', Vul:'Vulpecula'
+};
 
 
 // ----- Coordinate conversion -----
@@ -46,7 +67,6 @@ function magToSize(mag) {
 
 // ----- Textures -----
 
-// A soft radial glow used as the sprite for every star point.
 function makeGlowTexture() {
   const size = 64;
   const canvas = document.createElement('canvas');
@@ -91,19 +111,22 @@ async function loadStars() {
 async function loadConstellations() {
   const res = await fetch('constellations.lines.json');
   const data = await res.json();
-  constellationLines = [];
+  constellationGroups = [];
   for (const feature of data.features) {
+    const id = feature.id;
     const geom = feature.geometry;
-    const paths = geom.type === 'MultiLineString' ? geom.coordinates : [geom.coordinates];
-    for (const path of paths) {
-      const points = path.map(([lon, lat]) => {
-        const ra = lon < 0 ? (lon + 360) / 15 : lon / 15;
-        return { ra, dec: lat };
-      });
-      constellationLines.push(points);
-    }
+    const rawPaths = geom.type === 'MultiLineString' ? geom.coordinates : [geom.coordinates];
+    const paths = rawPaths.map(path =>
+      path.map(([lon, lat]) => ({ ra: lon < 0 ? (lon + 360) / 15 : lon / 15, dec: lat }))
+    );
+    constellationGroups.push({
+      id,
+      name: CONSTELLATION_NAMES[id] || id,
+      paths,
+      lines: []
+    });
   }
-  console.log('loaded constellation paths:', constellationLines.length);
+  console.log('loaded constellations:', constellationGroups.length);
 }
 
 
@@ -112,13 +135,12 @@ async function loadConstellations() {
 function clearSky() {
   for (let i = scene.children.length - 1; i >= 0; i--) {
     const obj = scene.children[i];
-    if (obj.isMesh || obj.isLine || obj.isPoints) scene.remove(obj);
+    if (obj.isMesh || obj.isLine || obj.isPoints || obj.isSprite) scene.remove(obj);
   }
   starPoints = null;
   plottedStars = [];
 }
 
-// All stars as a single Points cloud with per-star size and brightness.
 function plotStars(observer, time) {
   const positions = [];
   const sizes = [];
@@ -173,26 +195,25 @@ function plotStars(observer, time) {
 }
 
 function drawConstellations(observer, time) {
-  const material = new THREE.LineBasicMaterial({
-    color: 0x6fa0ff,
-    transparent: true,
-    opacity: 0.45
-  });
-
-  for (const path of constellationLines) {
-    const vectors = [];
-    for (const pt of path) {
-      const hor = Astronomy.Horizon(time, observer, pt.ra, pt.dec, 'normal');
-      if (hor.altitude < -10) { vectors.length = 0; break; }
-      vectors.push(altAzToVector(hor.altitude, hor.azimuth));
+  for (const group of constellationGroups) {
+    group.lines = [];
+    for (const path of group.paths) {
+      const vectors = [];
+      for (const pt of path) {
+        const hor = Astronomy.Horizon(time, observer, pt.ra, pt.dec, 'normal');
+        if (hor.altitude < -10) { vectors.length = 0; break; }
+        vectors.push(altAzToVector(hor.altitude, hor.azimuth));
+      }
+      if (vectors.length < 2) continue;
+      const geometry = new THREE.BufferGeometry().setFromPoints(vectors);
+      const material = new THREE.LineBasicMaterial({ color: 0x6fa0ff, transparent: true, opacity: 0.4 });
+      const line = new THREE.Line(geometry, material);
+      group.lines.push(line);
+      scene.add(line);
     }
-    if (vectors.length < 2) continue;
-    const geometry = new THREE.BufferGeometry().setFromPoints(vectors);
-    scene.add(new THREE.Line(geometry, material));
   }
 }
 
-// A bright body (Sun/Moon) drawn as a disc with a soft halo behind it.
 function plotBody(body, coreColor, haloColor, size, observer, time) {
   const equ = Astronomy.Equator(body, time, observer, true, true);
   const hor = Astronomy.Horizon(time, observer, equ.ra, equ.dec, 'normal');
@@ -280,23 +301,38 @@ function setCameraFromDevice() {
 
 // ----- Identification -----
 
-// Find the named star closest to the reticle (screen center) and show it.
 function updateIdentification() {
   const label = document.getElementById('starLabel');
-  if (!plottedStars.length) { label.textContent = ''; return; }
-
   camera.getWorldDirection(camDir);
 
-  let best = null;
-  let bestDot = 0.9995; // angular threshold: only very close to center counts
-
+  // nearest named star to the reticle
+  let bestStar = null, bestStarDot = 0.9995;
   for (const s of plottedStars) {
     tmpVec.copy(s.position).normalize();
     const dot = tmpVec.dot(camDir);
-    if (dot > bestDot) { bestDot = dot; best = s; }
+    if (dot > bestStarDot) { bestStarDot = dot; bestStar = s; }
   }
 
-  label.textContent = best ? best.name : '';
+  // nearest constellation: dim all, find closest line vertex, brighten its group
+  let bestGroup = null, bestGroupDot = 0.999;
+  for (const group of constellationGroups) {
+    for (const line of group.lines) {
+      line.material.opacity = 0.4;
+      const arr = line.geometry.attributes.position.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        tmpVec.set(arr[i], arr[i + 1], arr[i + 2]).normalize();
+        const dot = tmpVec.dot(camDir);
+        if (dot > bestGroupDot) { bestGroupDot = dot; bestGroup = group; }
+      }
+    }
+  }
+  if (bestGroup) {
+    for (const line of bestGroup.lines) line.material.opacity = 0.95;
+  }
+
+  if (bestStar) label.textContent = bestStar.name;
+  else if (bestGroup) label.textContent = bestGroup.name;
+  else label.textContent = '';
 }
 
 
@@ -434,9 +470,13 @@ function initializeApp() {
 
 function toggleIdentify() {
   identifyOn = !identifyOn;
-  const btn = document.getElementById('identifyBtn');
-  btn.classList.toggle('active', identifyOn);
-  if (!identifyOn) document.getElementById('starLabel').textContent = '';
+  document.getElementById('identifyBtn').classList.toggle('active', identifyOn);
+  if (!identifyOn) {
+    document.getElementById('starLabel').textContent = '';
+    for (const group of constellationGroups) {
+      for (const line of group.lines) line.material.opacity = 0.4;
+    }
+  }
 }
 
 

@@ -1,179 +1,195 @@
-:root {
-    --primary-glow: rgba(0, 255, 170, 0.8);
-    --hud-color: #00ffaa;
-    --bg-overlay: rgba(5, 10, 15, 0.85);
-  }
-  
-  body, html {
-    margin: 0;
-    padding: 0;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-    font-family: 'Courier New', Courier, monospace; /* Sci-fi feel */
-    background-color: #000;
-    color: #fff;
-    user-select: none;
-  }
-  
-  canvas {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 2; /* Changed from -1 */
-  }
-  
-  /* --- OVERLAY (Onboarding) --- */
-  #introOverlay {
-    position: fixed;
-    inset: 0;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 50;
-    transition: opacity 0.6s ease;
-  }
-  
-  .intro-content {
-    text-align: center;
-  }
-  
-  .intro-content h1 {
-    font-size: 3rem;
-    letter-spacing: 0.5rem;
-    margin-bottom: 0.5rem;
-    text-shadow: 0 0 20px var(--primary-glow);
-  }
-  
-  .intro-content p {
-    color: #aaa;
-    margin-bottom: 3rem;
-    font-size: 1.1rem;
-  }
-  
-  .primary-btn {
-    background: rgba(0, 255, 170, 0.1);
-    border: 1px solid var(--hud-color);
-    color: var(--hud-color);
-    padding: 15px 40px;
-    font-size: 1.2rem;
-    font-family: inherit;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    cursor: pointer;
-    border-radius: 4px;
-    box-shadow: 0 0 15px rgba(0, 255, 170, 0.2), inset 0 0 15px rgba(0, 255, 170, 0.1);
-    transition: all 0.3s ease;
-  }
-  
-  .primary-btn:active {
-    background: var(--hud-color);
-    color: #000;
-    box-shadow: 0 0 30px var(--primary-glow);
-  }
-  
-  /* --- MAIN HUD UI --- */
-  #arUI {
-    opacity: 1;
-    transition: opacity 0.5s ease;
-  }
-  
-  .hidden {
-    opacity: 0 !important;
-    pointer-events: none;
-  }
-  
-  /* Top Readout */
-  #hudTop {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    background: rgba(0, 0, 0, 0.4);
-    border-left: 3px solid var(--hud-color);
-    padding: 10px 15px;
-    border-radius: 0 4px 4px 0;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    z-index: 10;
-  }
-  
-  #arReadout {
-    color: var(--hud-color);
-    font-size: 0.9rem;
-    letter-spacing: 1px;
-  }
-  
-  /* Center Reticle */
-  #crosshair {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 11;
-    pointer-events: none;
-  }
-  
-  .reticle {
-    width: 40px;
-    height: 40px;
-    border: 1.5px solid rgba(255, 50, 50, 0.7); /* Red for targeting */
-    border-radius: 50%;
-    position: relative;
-    box-shadow: 0 0 10px rgba(255, 50, 50, 0.3);
-  }
-  
-  .reticle::before, .reticle::after {
-    content: '';
-    position: absolute;
-    background: rgba(255, 50, 50, 0.9);
-  }
-  
-  /* Horizontal line */
-  .reticle::before {
-    top: 50%; left: -10px; right: -10px; height: 1.5px;
-    transform: translateY(-50%);
-  }
-  
-  /* Vertical line */
-  .reticle::after {
-    left: 50%; top: -10px; bottom: -10px; width: 1.5px;
-    transform: translateX(-50%);
-  }
-  
-  /* Bottom Controls */
-  #hudBottom {
-    position: fixed;
-    bottom: 40px;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    z-index: 10;
-  }
-  
-  .hud-btn {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 30px;
-    font-family: inherit;
-    font-size: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    transition: all 0.2s ease;
-  }
-  
-  .hud-btn:active {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: #fff;
-  }
+
+   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+   :root {
+     --bg-deep: #060912;
+     --bg-panel: rgba(10, 16, 28, 0.72);
+     --line: rgba(180, 200, 235, 0.18);
+     --line-strong: rgba(180, 200, 235, 0.34);
+     --text: #e8ecf6;
+     --text-dim: #8a93a8;
+     --amber: #f2b25c;
+     --amber-soft: rgba(242, 178, 92, 0.14);
+     --target: #ff6b5e;
+     --font-ui: 'Space Grotesk', system-ui, sans-serif;
+     --font-mono: 'IBM Plex Mono', monospace;
+   }
+   
+   * { box-sizing: border-box; }
+   
+   body, html {
+     margin: 0;
+     padding: 0;
+     width: 100vw;
+     height: 100vh;
+     overflow: hidden;
+     font-family: var(--font-ui);
+     background-color: var(--bg-deep);
+     color: var(--text);
+     user-select: none;
+     -webkit-user-select: none;
+   }
+   
+   canvas {
+     position: fixed;
+     inset: 0;
+     width: 100vw;
+     height: 100vh;
+     z-index: 2;
+   }
+   
+   /* Intro overlay */
+   #introOverlay {
+     position: fixed;
+     inset: 0;
+     background:
+       radial-gradient(ellipse at 50% 30%, rgba(40, 55, 90, 0.35), transparent 60%),
+       var(--bg-deep);
+     display: flex;
+     justify-content: center;
+     align-items: center;
+     z-index: 50;
+     transition: opacity 0.6s ease;
+   }
+   
+   .intro-content {
+     text-align: center;
+     padding: 0 2rem;
+     max-width: 420px;
+   }
+   
+   .intro-content h1 {
+     font-size: clamp(3.2rem, 18vw, 5.5rem);
+     font-weight: 500;
+     letter-spacing: 0.18em;
+     margin: 0 0 0.4rem;
+     text-indent: 0.18em;
+     line-height: 1;
+   }
+   
+   .intro-content p {
+     font-family: var(--font-mono);
+     font-size: 0.82rem;
+     letter-spacing: 0.22em;
+     text-transform: uppercase;
+     color: var(--text-dim);
+     margin: 0 0 3.5rem;
+   }
+   
+   .primary-btn {
+     background: transparent;
+     border: 1px solid var(--line-strong);
+     color: var(--text);
+     padding: 16px 38px;
+     font-family: var(--font-mono);
+     font-size: 0.8rem;
+     letter-spacing: 0.18em;
+     text-transform: uppercase;
+     cursor: pointer;
+     border-radius: 2px;
+     transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+   }
+   
+   .primary-btn:hover { border-color: var(--amber); color: var(--amber); }
+   .primary-btn:active { background: var(--amber-soft); }
+   
+   /* Main HUD */
+   #arUI { opacity: 1; transition: opacity 0.5s ease; }
+   
+   .hidden { opacity: 0 !important; pointer-events: none; }
+   
+   #hudTop {
+     position: fixed;
+     top: env(safe-area-inset-top, 16px);
+     left: 16px;
+     margin-top: 16px;
+     z-index: 10;
+   }
+   
+   #arReadout {
+     font-family: var(--font-mono);
+     font-size: 0.72rem;
+     letter-spacing: 0.14em;
+     color: var(--text-dim);
+     background: var(--bg-panel);
+     border: 1px solid var(--line);
+     border-radius: 2px;
+     padding: 8px 12px;
+     backdrop-filter: blur(6px);
+     -webkit-backdrop-filter: blur(6px);
+   }
+   
+   /* Center reticle */
+   #crosshair {
+     position: fixed;
+     top: 50%;
+     left: 50%;
+     transform: translate(-50%, -50%);
+     z-index: 11;
+     pointer-events: none;
+   }
+   
+   .reticle {
+     width: 46px;
+     height: 46px;
+     border: 1px solid rgba(255, 107, 94, 0.55);
+     border-radius: 50%;
+     position: relative;
+   }
+   
+   .reticle::before,
+   .reticle::after {
+     content: '';
+     position: absolute;
+     background: rgba(255, 107, 94, 0.8);
+   }
+   
+   .reticle::before {
+     top: 50%; left: 50%;
+     width: 1px; height: 12px;
+     transform: translate(-50%, -50%);
+   }
+   
+   .reticle::after {
+     top: 50%; left: 50%;
+     width: 12px; height: 1px;
+     transform: translate(-50%, -50%);
+   }
+   
+   /* Bottom controls */
+   #hudBottom {
+     position: fixed;
+     bottom: env(safe-area-inset-bottom, 28px);
+     margin-bottom: 28px;
+     width: 100%;
+     display: flex;
+     justify-content: center;
+     z-index: 10;
+   }
+   
+   .hud-btn {
+     background: var(--bg-panel);
+     border: 1px solid var(--line);
+     color: var(--text);
+     padding: 13px 22px;
+     border-radius: 2px;
+     font-family: var(--font-mono);
+     font-size: 0.74rem;
+     letter-spacing: 0.12em;
+     text-transform: uppercase;
+     display: flex;
+     align-items: center;
+     gap: 9px;
+     cursor: pointer;
+     backdrop-filter: blur(6px);
+     -webkit-backdrop-filter: blur(6px);
+     transition: border-color 0.2s ease, color 0.2s ease;
+   }
+   
+   .hud-btn svg { color: var(--amber); }
+   .hud-btn:hover { border-color: var(--line-strong); }
+   .hud-btn:active { color: var(--amber); border-color: var(--amber); }
+   
+   @media (prefers-reduced-motion: reduce) {
+     * { transition: none !important; }
+   }

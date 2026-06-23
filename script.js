@@ -13,6 +13,10 @@ let arActive = false;
 let headingOffset = 0;
 let rawAlpha = 0, rawBeta = 0, rawGamma = 0;
 
+// Approximate magnetic declination for Bulgaria (degrees east).
+// Converts a magnetic-north heading to true north.
+const MAGNETIC_DECLINATION = 5;
+
 const zee = new THREE.Vector3(0, 0, 1);
 const q0 = new THREE.Quaternion();
 const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
@@ -275,12 +279,13 @@ async function startCamera() {
 
 // ----- Orientation sensors -----
 
+// Prefer deviceorientationabsolute (Android) since its heading is referenced
+// to magnetic north. Fall back to the standard event otherwise.
 function enableOrientation() {
-  const needsPermission =
-    typeof DeviceOrientationEvent !== 'undefined' &&
-    typeof DeviceOrientationEvent.requestPermission === 'function';
-
-  if (needsPermission) {
+  if ('ondeviceorientationabsolute' in window) {
+    window.addEventListener('deviceorientationabsolute', onOrientation);
+  } else if (typeof DeviceOrientationEvent !== 'undefined' &&
+             typeof DeviceOrientationEvent.requestPermission === 'function') {
     DeviceOrientationEvent.requestPermission()
       .then(state => {
         if (state === 'granted') {
@@ -297,7 +302,7 @@ function enableOrientation() {
 
 function onOrientation(event) {
   if (event.alpha === null) return;
-  rawAlpha = event.alpha;
+  rawAlpha = event.alpha + MAGNETIC_DECLINATION;
   rawBeta = event.beta;
   rawGamma = event.gamma;
   arActive = true;

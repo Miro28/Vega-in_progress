@@ -446,6 +446,7 @@ function onOrientation(event) {
   rawBeta = event.beta;
   rawGamma = event.gamma;
   arActive = true;
+  controls.enabled = false;
 }
 
 

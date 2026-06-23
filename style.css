@@ -132,18 +132,6 @@
      z-index: 10;
    }
    
-   #arReadout {
-     font-family: var(--font-mono);
-     font-size: 0.7rem;
-     letter-spacing: 0.14em;
-     color: var(--blue);
-     background: var(--bg-panel);
-     border: 1px solid var(--line);
-     border-radius: 3px;
-     padding: 8px 12px;
-     backdrop-filter: blur(8px);
-     -webkit-backdrop-filter: blur(8px);
-   }
    
    /* Reticle with a soft pulse */
    #crosshair {

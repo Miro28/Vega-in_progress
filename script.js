@@ -6,41 +6,63 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer, controls;
 let stars = [];
+let starPoints = null;          // THREE.Points object holding all stars
+let plottedStars = [];          // { name, position } for identification
 let constellationLines = [];
 let currentObserver = null;
 
 let arActive = false;
+let identifyOn = false;
 let headingOffset = 0;
 let rawAlpha = 0, rawBeta = 0, rawGamma = 0;
 
-// Approximate magnetic declination for Bulgaria (degrees east).
-// Converts a magnetic-north heading to true north.
-const MAGNETIC_DECLINATION = 5;
+const MAGNETIC_DECLINATION = 5; // degrees east, approx for Bulgaria
 
 const zee = new THREE.Vector3(0, 0, 1);
 const q0 = new THREE.Quaternion();
 const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 const tmpEuler = new THREE.Euler();
 
+const tmpVec = new THREE.Vector3();
+const camDir = new THREE.Vector3();
+
 
 // ----- Coordinate conversion -----
 
-// Altitude/azimuth (degrees) to a point on a sphere around the viewer.
 function altAzToVector(altitude, azimuth, radius = 100) {
   const altRad = altitude * Math.PI / 180;
   const azRad = azimuth * Math.PI / 180;
-
   const x = radius * Math.cos(altRad) * Math.sin(azRad);
   const y = radius * Math.sin(altRad);
   const z = -radius * Math.cos(altRad) * Math.cos(azRad);
-
   return new THREE.Vector3(x, y, z);
 }
 
 function magToSize(mag) {
-  const size = 1.5 * Math.pow(2.512, (1 - mag) * 0.4);
-  return Math.max(0.15, Math.min(size, 4));
+  const size = 7 * Math.pow(2.512, (1 - mag) * 0.18);
+  return Math.max(2, Math.min(size, 26));
 }
+
+
+// ----- Textures -----
+
+// A soft radial glow used as the sprite for every star point.
+function makeGlowTexture() {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.25)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+
+const glowTexture = makeGlowTexture();
 
 
 // ----- Data loading -----
@@ -50,7 +72,6 @@ async function loadStars() {
   const text = await res.text();
   const lines = text.trim().split('\n');
   const headers = lines[0].split(',');
-
   const idx = name => headers.indexOf(name);
   const raI = idx('ra'), decI = idx('dec'), magI = idx('mag'),
         nameI = idx('proper'), hipI = idx('hip');
@@ -70,14 +91,10 @@ async function loadStars() {
 async function loadConstellations() {
   const res = await fetch('constellations.lines.json');
   const data = await res.json();
-
   constellationLines = [];
   for (const feature of data.features) {
     const geom = feature.geometry;
-    const paths = geom.type === 'MultiLineString'
-      ? geom.coordinates
-      : [geom.coordinates];
-
+    const paths = geom.type === 'MultiLineString' ? geom.coordinates : [geom.coordinates];
     for (const path of paths) {
       const points = path.map(([lon, lat]) => {
         const ra = lon < 0 ? (lon + 360) / 15 : lon / 15;
@@ -95,26 +112,72 @@ async function loadConstellations() {
 function clearSky() {
   for (let i = scene.children.length - 1; i >= 0; i--) {
     const obj = scene.children[i];
-    if (obj.isMesh || obj.isLine) scene.remove(obj);
+    if (obj.isMesh || obj.isLine || obj.isPoints) scene.remove(obj);
   }
+  starPoints = null;
+  plottedStars = [];
 }
 
+// All stars as a single Points cloud with per-star size and brightness.
 function plotStars(observer, time) {
+  const positions = [];
+  const sizes = [];
+  const opacities = [];
+  plottedStars = [];
+
   for (const star of stars) {
     const hor = Astronomy.Horizon(time, observer, star.ra, star.dec, 'normal');
     if (hor.altitude < 0) continue;
 
     const pos = altAzToVector(hor.altitude, hor.azimuth);
-    const geometry = new THREE.SphereGeometry(magToSize(star.mag), 6, 6);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const dot = new THREE.Mesh(geometry, material);
-    dot.position.copy(pos);
-    scene.add(dot);
+    positions.push(pos.x, pos.y, pos.z);
+    sizes.push(magToSize(star.mag));
+    opacities.push(Math.max(0.35, Math.min(1, 1.1 - star.mag * 0.12)));
+
+    if (star.name) plottedStars.push({ name: star.name, position: pos.clone() });
   }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+  geometry.setAttribute('alpha', new THREE.Float32BufferAttribute(opacities, 1));
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: { glow: { value: glowTexture } },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: `
+      attribute float size;
+      attribute float alpha;
+      varying float vAlpha;
+      void main() {
+        vAlpha = alpha;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D glow;
+      varying float vAlpha;
+      void main() {
+        vec4 tex = texture2D(glow, gl_PointCoord);
+        gl_FragColor = vec4(tex.rgb, tex.a * vAlpha);
+      }
+    `
+  });
+
+  starPoints = new THREE.Points(geometry, material);
+  scene.add(starPoints);
 }
 
 function drawConstellations(observer, time) {
-  const material = new THREE.LineBasicMaterial({ color: 0x2244aa });
+  const material = new THREE.LineBasicMaterial({
+    color: 0x6fa0ff,
+    transparent: true,
+    opacity: 0.45
+  });
 
   for (const path of constellationLines) {
     const vectors = [];
@@ -124,31 +187,44 @@ function drawConstellations(observer, time) {
       vectors.push(altAzToVector(hor.altitude, hor.azimuth));
     }
     if (vectors.length < 2) continue;
-
     const geometry = new THREE.BufferGeometry().setFromPoints(vectors);
     scene.add(new THREE.Line(geometry, material));
   }
 }
 
-function plotBody(body, color, size, observer, time) {
+// A bright body (Sun/Moon) drawn as a disc with a soft halo behind it.
+function plotBody(body, coreColor, haloColor, size, observer, time) {
   const equ = Astronomy.Equator(body, time, observer, true, true);
   const hor = Astronomy.Horizon(time, observer, equ.ra, equ.dec, 'normal');
   if (hor.altitude < 0) return;
 
   const pos = altAzToVector(hor.altitude, hor.azimuth);
-  const geometry = new THREE.SphereGeometry(size, 16, 16);
-  const material = new THREE.MeshBasicMaterial({ color });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.copy(pos);
-  scene.add(mesh);
+
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 32, 32),
+    new THREE.MeshBasicMaterial({ color: coreColor })
+  );
+  core.position.copy(pos);
+  scene.add(core);
+
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture,
+    color: haloColor,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  }));
+  halo.scale.setScalar(size * 5);
+  halo.position.copy(pos);
+  scene.add(halo);
 }
 
 function renderSky(observer, time) {
   clearSky();
   plotStars(observer, time);
   drawConstellations(observer, time);
-  plotBody(Astronomy.Body.Sun, 0xffdd00, 6, observer, time);
-  plotBody(Astronomy.Body.Moon, 0x636363, 5, observer, time);
+  plotBody(Astronomy.Body.Sun, 0xfff2cc, 0xffcc55, 5, observer, time);
+  plotBody(Astronomy.Body.Moon, 0xd8d8e0, 0x8899bb, 4, observer, time);
 }
 
 
@@ -180,16 +256,14 @@ function startScene() {
 
 function animate() {
   requestAnimationFrame(animate);
-  if (arActive) {
-    setCameraFromDevice();
-  } else {
-    controls.update();
-  }
+  if (arActive) setCameraFromDevice();
+  else controls.update();
+
+  if (identifyOn) updateIdentification();
+
   renderer.render(scene, camera);
 }
 
-// Point the camera using the phone's orientation, with the heading correction
-// applied at render time so calibration takes effect immediately.
 function setCameraFromDevice() {
   const deg2rad = Math.PI / 180;
   const alpha = (rawAlpha - headingOffset) * deg2rad;
@@ -204,6 +278,28 @@ function setCameraFromDevice() {
 }
 
 
+// ----- Identification -----
+
+// Find the named star closest to the reticle (screen center) and show it.
+function updateIdentification() {
+  const label = document.getElementById('starLabel');
+  if (!plottedStars.length) { label.textContent = ''; return; }
+
+  camera.getWorldDirection(camDir);
+
+  let best = null;
+  let bestDot = 0.9995; // angular threshold: only very close to center counts
+
+  for (const s of plottedStars) {
+    tmpVec.copy(s.position).normalize();
+    const dot = tmpVec.dot(camDir);
+    if (dot > bestDot) { bestDot = dot; best = s; }
+  }
+
+  label.textContent = best ? best.name : '';
+}
+
+
 // ----- Location -----
 
 function findLocation() {
@@ -215,25 +311,17 @@ function findLocation() {
 }
 
 function onPosition(position) {
-  const latitude = position.coords.latitude;
-  const longitude = position.coords.longitude;
-  currentObserver = new Astronomy.Observer(latitude, longitude, 0);
+  currentObserver = new Astronomy.Observer(
+    position.coords.latitude, position.coords.longitude, 0);
   renderSky(currentObserver, new Date());
 }
 
 function onLocationError(error) {
   switch (error.code) {
-    case error.PERMISSION_DENIED:
-      alert('Location permission denied.');
-      break;
-    case error.POSITION_UNAVAILABLE:
-      alert('Location information is unavailable.');
-      break;
-    case error.TIMEOUT:
-      alert('Location request timed out.');
-      break;
-    default:
-      alert('An unknown location error occurred.');
+    case error.PERMISSION_DENIED: alert('Location permission denied.'); break;
+    case error.POSITION_UNAVAILABLE: alert('Location information is unavailable.'); break;
+    case error.TIMEOUT: alert('Location request timed out.'); break;
+    default: alert('An unknown location error occurred.');
   }
 }
 
@@ -260,7 +348,6 @@ async function startCamera() {
   document.body.appendChild(video);
 
   const portrait = window.innerHeight > window.innerWidth;
-
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
@@ -279,8 +366,6 @@ async function startCamera() {
 
 // ----- Orientation sensors -----
 
-// Prefer deviceorientationabsolute (Android) since its heading is referenced
-// to magnetic north. Fall back to the standard event otherwise.
 function enableOrientation() {
   if ('ondeviceorientationabsolute' in window) {
     window.addEventListener('deviceorientationabsolute', onOrientation);
@@ -288,11 +373,8 @@ function enableOrientation() {
              typeof DeviceOrientationEvent.requestPermission === 'function') {
     DeviceOrientationEvent.requestPermission()
       .then(state => {
-        if (state === 'granted') {
-          window.addEventListener('deviceorientation', onOrientation);
-        } else {
-          alert('Orientation permission denied.');
-        }
+        if (state === 'granted') window.addEventListener('deviceorientation', onOrientation);
+        else alert('Orientation permission denied.');
       })
       .catch(err => alert('Orientation error: ' + err));
   } else {
@@ -306,32 +388,26 @@ function onOrientation(event) {
   rawBeta = event.beta;
   rawGamma = event.gamma;
   arActive = true;
-
-  document.getElementById('arReadout').textContent =
-    `AZ ${event.alpha.toFixed(0)}  ALT ${event.beta.toFixed(0)}  ROLL ${event.gamma.toFixed(0)}`;
 }
 
 
 // ----- Calibration -----
 
-// Aim the reticle at the Moon and call this. Shifts the heading so the
-// reticle direction matches the Moon's true bearing.
-function calibrateOnMoon() {
+function calibrateOnBody(body) {
   if (!currentObserver) { alert('Find location first.'); return; }
-
   setCameraFromDevice();
 
   const time = new Date();
-  const equ = Astronomy.Equator(Astronomy.Body.Moon, time, currentObserver, true, true);
+  const equ = Astronomy.Equator(body, time, currentObserver, true, true);
   const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
-  const moonAz = hor.azimuth;
+  const bodyAz = hor.azimuth;
 
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
   let crossAz = Math.atan2(dir.x, -dir.z) * 180 / Math.PI;
   if (crossAz < 0) crossAz += 360;
 
-  let diff = crossAz - moonAz;
+  let diff = crossAz - bodyAz;
   while (diff > 180) diff -= 360;
   while (diff < -180) diff += 360;
 
@@ -343,8 +419,7 @@ function calibrateOnMoon() {
 // ----- App start -----
 
 function initializeApp() {
-  const overlay = document.getElementById('introOverlay');
-  overlay.style.display = 'none';
+  document.getElementById('introOverlay').style.display = 'none';
 
   if (document.documentElement.requestFullscreen) {
     document.documentElement.requestFullscreen().catch(() => {});
@@ -354,15 +429,22 @@ function initializeApp() {
   startCamera();
   findLocation();
 
-  const arUI = document.getElementById('arUI');
-  arUI.classList.remove('hidden');
+  document.getElementById('arUI').classList.remove('hidden');
+}
+
+function toggleIdentify() {
+  identifyOn = !identifyOn;
+  const btn = document.getElementById('identifyBtn');
+  btn.classList.toggle('active', identifyOn);
+  if (!identifyOn) document.getElementById('starLabel').textContent = '';
 }
 
 
 // ----- Wiring -----
 
 document.getElementById('startAppBtn').addEventListener('click', initializeApp);
-document.getElementById('calBtn').addEventListener('click', calibrateOnMoon);
+document.getElementById('calBtn').addEventListener('click', () => calibrateOnBody(Astronomy.Body.Moon));
+document.getElementById('identifyBtn').addEventListener('click', toggleIdentify);
 
 loadStars();
 loadConstellations();

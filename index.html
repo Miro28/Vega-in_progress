@@ -20,26 +20,34 @@
     <div id="introOverlay">
         <div class="intro-content">
             <h1>VEGA</h1>
-            <p>Astrometry & Augmented Reality</p>
+            <p>Astrometry &amp; Augmented Reality</p>
             <button id="startAppBtn" class="primary-btn">Initialize System</button>
         </div>
     </div>
 
     <div id="arUI" class="hidden">
         <div id="hudTop">
-            <div id="arReadout">Awaiting telemetry...</div>
+            <div id="arReadout">Awaiting telemetry</div>
         </div>
-        
+
         <div id="crosshair">
             <div class="reticle"></div>
+            <div id="starLabel"></div>
         </div>
 
         <div id="hudBottom">
+            <button id="identifyBtn" class="hud-btn">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                </svg>
+                Identify
+            </button>
             <button id="calBtn" class="hud-btn">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                 </svg>
-                Sync to Moon
+                Sync
             </button>
         </div>
     </div>

@@ -1,3 +1,5 @@
+/* VEGA - precision-instrument aesthetic
+   Midnight base, single amber accent, geometric sans, hairline detailing. */
 
    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
@@ -52,11 +54,7 @@
      transition: opacity 0.6s ease;
    }
    
-   .intro-content {
-     text-align: center;
-     padding: 0 2rem;
-     max-width: 420px;
-   }
+   .intro-content { text-align: center; padding: 0 2rem; max-width: 420px; }
    
    .intro-content h1 {
      font-size: clamp(3.2rem, 18vw, 5.5rem);
@@ -95,7 +93,6 @@
    
    /* Main HUD */
    #arUI { opacity: 1; transition: opacity 0.5s ease; }
-   
    .hidden { opacity: 0 !important; pointer-events: none; }
    
    #hudTop {
@@ -137,8 +134,7 @@
      position: relative;
    }
    
-   .reticle::before,
-   .reticle::after {
+   .reticle::before, .reticle::after {
      content: '';
      position: absolute;
      background: rgba(255, 107, 94, 0.8);
@@ -156,6 +152,20 @@
      transform: translate(-50%, -50%);
    }
    
+   /* Star name shown under the reticle when identify is on */
+   #starLabel {
+     position: absolute;
+     top: calc(50% + 34px);
+     left: 50%;
+     transform: translateX(-50%);
+     white-space: nowrap;
+     font-family: var(--font-mono);
+     font-size: 0.8rem;
+     letter-spacing: 0.1em;
+     color: var(--amber);
+     text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+   }
+   
    /* Bottom controls */
    #hudBottom {
      position: fixed;
@@ -164,6 +174,7 @@
      width: 100%;
      display: flex;
      justify-content: center;
+     gap: 12px;
      z-index: 10;
    }
    
@@ -171,10 +182,10 @@
      background: var(--bg-panel);
      border: 1px solid var(--line);
      color: var(--text);
-     padding: 13px 22px;
+     padding: 13px 20px;
      border-radius: 2px;
      font-family: var(--font-mono);
-     font-size: 0.74rem;
+     font-size: 0.72rem;
      letter-spacing: 0.12em;
      text-transform: uppercase;
      display: flex;
@@ -189,6 +200,7 @@
    .hud-btn svg { color: var(--amber); }
    .hud-btn:hover { border-color: var(--line-strong); }
    .hud-btn:active { color: var(--amber); border-color: var(--amber); }
+   .hud-btn.active { border-color: var(--amber); color: var(--amber); }
    
    @media (prefers-reduced-motion: reduce) {
      * { transition: none !important; }

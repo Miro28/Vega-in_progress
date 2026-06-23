@@ -6,6 +6,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer, controls;
 let stars = [];
+let smoothAlpha = 0, smoothBeta = 0, smoothGamma = 0;
+let smoothingReady = false;
 let starPoints = null;
 let plottedStars = [];          // { name, position } for identification
 let constellationGroups = [];   // { id, name, paths, lines }
@@ -286,10 +288,24 @@ function animate() {
 }
 
 function setCameraFromDevice() {
+  // smoothing factor: lower = smoother but laggier, higher = snappier but jitterier
+  const k = 0.20;
+
+  if (!smoothingReady) {
+    smoothAlpha = rawAlpha;
+    smoothBeta = rawBeta;
+    smoothGamma = rawGamma;
+    smoothingReady = true;
+  } else {
+    smoothAlpha = lerpAngle(smoothAlpha, rawAlpha, k);
+    smoothBeta = smoothBeta + (rawBeta - smoothBeta) * k;
+    smoothGamma = smoothGamma + (rawGamma - smoothGamma) * k;
+  }
+
   const deg2rad = Math.PI / 180;
-  const alpha = (rawAlpha - headingOffset) * deg2rad;
-  const beta = rawBeta * deg2rad;
-  const gamma = rawGamma * deg2rad;
+  const alpha = (smoothAlpha - headingOffset) * deg2rad;
+  const beta = smoothBeta * deg2rad;
+  const gamma = smoothGamma * deg2rad;
   const orient = (screen.orientation?.angle || 0) * deg2rad;
 
   tmpEuler.set(beta, alpha, -gamma, 'YXZ');
@@ -298,6 +314,12 @@ function setCameraFromDevice() {
   camera.quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
 }
 
+function lerpAngle(a, b, k) {
+  let diff = b - a;
+  while (diff > 180) diff -= 360;
+  while (diff < -180) diff += 360;
+  return a + diff * k;
+}
 
 // ----- Identification -----
 

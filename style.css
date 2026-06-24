@@ -264,3 +264,68 @@
   letter-spacing: 0.05em;
   color: var(--text);
 }
+
+/* ---- Top HUD (utility toggles) ---- */
+#hudTop {
+  position: fixed;
+  top: env(safe-area-inset-top, 16px);
+  margin-top: 16px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  z-index: 10;
+}
+.hud-btn.small {
+  padding: 9px 14px;
+  font-size: 0.62rem;
+  gap: 7px;
+}
+
+/* ---- Time scrubbing panel ---- */
+#timePanel {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 28px) + 92px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(86vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
+}
+#timeSlider {
+  width: 100%;
+  accent-color: var(--amber);
+}
+#timeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#timeReadout {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+}
+#resetTimeBtn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#resetTimeBtn:hover { border-color: var(--line-strong); }
+#resetTimeBtn:active { transform: scale(0.97); }

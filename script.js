@@ -8,6 +8,7 @@ let scene, camera, renderer, controls;
 let stars = [];
 let starPoints = null;
 let plottedStars = [];          // { name, position } for identification
+let plottedBodies = [];         // { name, position } Sun/Moon/planets for identification
 let constellationGroups = [];   // { id, name, paths, lines }
 let currentObserver = null;
 
@@ -17,6 +18,10 @@ let smoothReady = false;
 let arActive = false;
 let identifyOn = false;
 let headingOffset = 0;
+let timeOffsetMs = 0;           // ms added to real time for time-scrubbing
+let linesVisible = true;        // constellation lines on/off
+let videoEl = null;             // camera feed <video>
+let cameraStream = null;        // active MediaStream, for stopping/restarting
 let rawAlpha = 0, rawBeta = 0, rawGamma = 0;
 
 let smoothAlpha = 0, smoothBeta = 0, smoothGamma = 0;
@@ -176,6 +181,7 @@ function clearSky() {
   }
   starPoints = null;
   plottedStars = [];
+  plottedBodies = [];
 }
 
 function plotStars(observer, time) {
@@ -245,18 +251,21 @@ function drawConstellations(observer, time) {
       const geometry = new THREE.BufferGeometry().setFromPoints(vectors);
       const material = new THREE.LineBasicMaterial({ color: 0x6fa0ff, transparent: true, opacity: 0.4 });
       const line = new THREE.Line(geometry, material);
+      line.visible = linesVisible;
       group.lines.push(line);
       scene.add(line);
     }
   }
 }
 
-function plotBody(body, coreColor, haloColor, size, observer, time) {
+function plotBody(body, coreColor, haloColor, size, observer, time, name) {
   const equ = Astronomy.Equator(body, time, observer, true, true);
   const hor = Astronomy.Horizon(time, observer, equ.ra, equ.dec, 'normal');
   if (hor.altitude < 0) return;
 
   const pos = altAzToVector(hor.altitude, hor.azimuth);
+
+  if (name) plottedBodies.push({ name, position: pos.clone() });
 
   // scale physical size up with the larger sky radius
   const coreSize = size * (SKY_RADIUS / 100);
@@ -284,8 +293,14 @@ function renderSky(observer, time) {
   clearSky();
   plotStars(observer, time);
   drawConstellations(observer, time);
-  plotBody(Astronomy.Body.Sun, 0xfff2cc, 0xffcc55, 5, observer, time);
-  plotBody(Astronomy.Body.Moon, 0xd8d8e0, 0x8899bb, 4, observer, time);
+  plotBody(Astronomy.Body.Sun, 0xfff2cc, 0xffcc55, 5, observer, time, 'Sun');
+  plotBody(Astronomy.Body.Moon, 0xd8d8e0, 0x8899bb, 4, observer, time, 'Moon');
+  // Naked-eye planets. Smaller than Sun/Moon; tinted roughly to their real hue.
+  plotBody(Astronomy.Body.Mercury, 0xc9b89a, 0xa89878, 1.4, observer, time, 'Mercury');
+  plotBody(Astronomy.Body.Venus,   0xfff4d6, 0xffe9a8, 2.2, observer, time, 'Venus');
+  plotBody(Astronomy.Body.Mars,    0xff6b4a, 0xd14a2e, 1.6, observer, time, 'Mars');
+  plotBody(Astronomy.Body.Jupiter, 0xf5e6c8, 0xd8c49a, 2.4, observer, time, 'Jupiter');
+  plotBody(Astronomy.Body.Saturn,  0xf0dba0, 0xcbb070, 2.0, observer, time, 'Saturn');
 }
 
 
@@ -350,6 +365,14 @@ function updateIdentification() {
   const label = document.getElementById('starLabel');
   camera.getWorldDirection(camDir);
 
+  // Bodies (Sun/Moon/planets) first — slightly wider cone since they're bright.
+  let bestBody = null, bestBodyDot = 0.9992;
+  for (const b of plottedBodies) {
+    tmpVec.copy(b.position).normalize();
+    const dot = tmpVec.dot(camDir);
+    if (dot > bestBodyDot) { bestBodyDot = dot; bestBody = b; }
+  }
+
   let bestStar = null, bestStarDot = 0.9995;
   for (const s of plottedStars) {
     tmpVec.copy(s.position).normalize();
@@ -373,9 +396,23 @@ function updateIdentification() {
     for (const line of bestGroup.lines) line.material.opacity = 0.95;
   }
 
-  if (bestStar) label.textContent = bestStar.name;
+  if (bestBody) label.textContent = bestBody.name;
+  else if (bestStar) label.textContent = bestStar.name;
   else if (bestGroup) label.textContent = bestGroup.name;
   else label.textContent = '';
+}
+
+
+// ----- Time -----
+
+// Real now plus any time-scrubbing offset.
+function currentTime() {
+  return new Date(Date.now() + timeOffsetMs);
+}
+
+// Re-render the sky at the current (possibly offset) time.
+function reRender() {
+  if (currentObserver) renderSky(currentObserver, currentTime());
 }
 
 
@@ -392,7 +429,7 @@ function findLocation() {
 function onPosition(position) {
   currentObserver = new Astronomy.Observer(
     position.coords.latitude, position.coords.longitude, 0);
-  renderSky(currentObserver, new Date());
+  reRender();
 }
 
 function onLocationError(error) {
@@ -413,33 +450,57 @@ async function startCamera() {
     return;
   }
 
-  const video = document.createElement('video');
-  video.setAttribute('playsinline', '');
-  video.setAttribute('autoplay', '');
-  video.setAttribute('muted', '');
-  video.muted = true;
-  video.style.position = 'fixed';
-  video.style.inset = '0';
-  video.style.width = '100vw';
-  video.style.height = '100vh';
-  video.style.objectFit = 'cover';
-  video.style.zIndex = '1';
-  document.body.appendChild(video);
+  if (!videoEl) {
+    videoEl = document.createElement('video');
+    videoEl.setAttribute('playsinline', '');
+    videoEl.setAttribute('autoplay', '');
+    videoEl.setAttribute('muted', '');
+    videoEl.muted = true;
+    videoEl.style.position = 'fixed';
+    videoEl.style.inset = '0';
+    videoEl.style.width = '100vw';
+    videoEl.style.height = '100vh';
+    videoEl.style.objectFit = 'cover';
+    videoEl.style.zIndex = '1';
+    document.body.appendChild(videoEl);
+  }
+  videoEl.style.display = 'block';
 
   const portrait = window.innerHeight > window.innerWidth;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
+    cameraStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: 'environment',
         width: { ideal: portrait ? 1080 : 1920 },
         height: { ideal: portrait ? 1920 : 1080 }
       }
     });
-    video.srcObject = stream;
-    video.play().catch(e => console.warn('Video play warning:', e));
+    videoEl.srcObject = cameraStream;
+    videoEl.play().catch(e => console.warn('Video play warning:', e));
   } catch (err) {
     alert('Camera error: ' + err.message);
   }
+}
+
+// Fully stops the camera (frees the hardware) and hides the feed.
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  if (videoEl) {
+    videoEl.srcObject = null;
+    videoEl.style.display = 'none';
+  }
+}
+
+let cameraOn = true;
+function toggleCamera() {
+  cameraOn = !cameraOn;
+  if (cameraOn) startCamera();
+  else stopCamera();
+  const btn = document.getElementById('cameraBtn');
+  if (btn) btn.classList.toggle('active', cameraOn);
 }
 
 
@@ -476,7 +537,7 @@ function calibrateOnBody(body) {
   if (!currentObserver) { alert('Find location first.'); return; }
   setCameraFromDevice();
 
-  const time = new Date();
+  const time = currentTime();
   const equ = Astronomy.Equator(body, time, currentObserver, true, true);
   const hor = Astronomy.Horizon(time, currentObserver, equ.ra, equ.dec, 'normal');
   const bodyAz = hor.azimuth;
@@ -509,6 +570,15 @@ function initializeApp() {
   findLocation();
 
   document.getElementById('arUI').classList.remove('hidden');
+
+  // Both default ON, reflect that in the buttons.
+  document.getElementById('cameraBtn')?.classList.add('active');
+  document.getElementById('linesBtn')?.classList.add('active');
+  updateTimeReadout();
+
+  // While live (no time offset), keep the sky current as real time passes.
+  // The sky drifts slowly, so a 30s refresh is smooth and cheap.
+  setInterval(() => { if (timeOffsetMs === 0) reRender(); }, 30000);
 }
 
 function toggleIdentify() {
@@ -575,9 +645,69 @@ function startIntroStarfield() {
 
 // ----- Wiring -----
 
+// Constellation lines on/off.
+function toggleLines() {
+  linesVisible = !linesVisible;
+  for (const group of constellationGroups) {
+    for (const line of group.lines) line.visible = linesVisible;
+  }
+  const btn = document.getElementById('linesBtn');
+  if (btn) btn.classList.toggle('active', linesVisible);
+}
+
+// Fullscreen, triggered manually after permission prompts have settled.
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.();
+  }
+}
+
+// ---- Time scrubbing ----
+const TIME_RANGE_MS = 7 * 24 * 3600 * 1000; // ±7 days
+
+function formatOffset(ms) {
+  if (ms === 0) return 'Live';
+  const sign = ms > 0 ? '+' : '−';
+  let s = Math.abs(ms) / 1000;
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600);  s -= h * 3600;
+  const m = Math.floor(s / 60);
+  if (d > 0) return `${sign}${d}d ${h}h`;
+  if (h > 0) return `${sign}${h}h ${m}m`;
+  return `${sign}${m}m`;
+}
+
+function updateTimeReadout() {
+  const r = document.getElementById('timeReadout');
+  if (r) r.textContent = formatOffset(timeOffsetMs);
+}
+
+function onTimeSlider(e) {
+  // Slider is -1000..1000; map to ±TIME_RANGE_MS.
+  const frac = parseInt(e.target.value, 10) / 1000;
+  timeOffsetMs = Math.round(frac * TIME_RANGE_MS);
+  updateTimeReadout();
+  reRender();
+}
+
+function resetTime() {
+  timeOffsetMs = 0;
+  const slider = document.getElementById('timeSlider');
+  if (slider) slider.value = '0';
+  updateTimeReadout();
+  reRender();
+}
+
 document.getElementById('startAppBtn').addEventListener('click', initializeApp);
 document.getElementById('calBtn').addEventListener('click', () => calibrateOnBody(Astronomy.Body.Moon));
 document.getElementById('identifyBtn').addEventListener('click', toggleIdentify);
+document.getElementById('linesBtn')?.addEventListener('click', toggleLines);
+document.getElementById('cameraBtn')?.addEventListener('click', toggleCamera);
+document.getElementById('fullscreenBtn')?.addEventListener('click', toggleFullscreen);
+document.getElementById('timeSlider')?.addEventListener('input', onTimeSlider);
+document.getElementById('resetTimeBtn')?.addEventListener('click', resetTime);
 
 // Show a blocking overlay whenever the device is in landscape; hide in portrait.
 function updateOrientationNotice() {

@@ -310,24 +310,12 @@ function setCameraFromDevice() {
   const beta = rawBeta * deg2rad;
   const gamma = rawGamma * deg2rad;
   const orient = (screen.orientation?.angle || 0) * deg2rad;
-
   tmpEuler.set(beta, alpha, -gamma, 'YXZ');
   camera.quaternion.setFromEuler(tmpEuler);
   camera.quaternion.multiply(q1);
   camera.quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
-
-  // smooth jitter by blending toward the new orientation (slerp avoids flips)
-  if (!smoothReady) {
-    smoothedQuat.copy(camera.quaternion);
-    smoothReady = true;
-  } else {
-    smoothedQuat.slerp(camera.quaternion, 0.2);
-    camera.quaternion.copy(smoothedQuat);
-  }
-
   camera.position.set(0, 0, 0);
 }
-
 
 // ----- Identification -----
 

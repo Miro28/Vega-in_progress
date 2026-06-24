@@ -321,7 +321,7 @@ function setCameraFromDevice() {
     smoothedQuat.copy(camera.quaternion);
     smoothReady = true;
   } else {
-    smoothedQuat.slerp(camera.quaternion, 0.2);
+    smoothedQuat.slerp(camera.quaternion, 0.85);
     camera.quaternion.copy(smoothedQuat);
   }
 

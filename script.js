@@ -15,6 +15,7 @@ let smoothedQuat = new THREE.Quaternion();
 let smoothReady = false;
 
 let arActive = false;
+let skyFrozen = false;
 let identifyOn = false;
 let headingOffset = 0;
 let rawAlpha = 0, rawBeta = 0, rawGamma = 0;
@@ -294,8 +295,13 @@ function startScene() {
 
 function animate() {
   requestAnimationFrame(animate);
-  if (arActive) setCameraFromDevice();
-  else controls.update();
+  if (skyFrozen) {
+    // hold the camera dead still; feed + reticle (DOM) keep moving
+  } else if (arActive) {
+    setCameraFromDevice();
+  } else {
+    controls.update();
+  }
 
   if (identifyOn) updateIdentification();
 
@@ -559,3 +565,15 @@ startIntroStarfield();
 loadStars();
 loadConstellations();
 startScene();
+
+// Double-tap anywhere to freeze/unfreeze the 3D sky (debug aid).
+// When frozen, the camera holds still while the video feed + reticle keep moving.
+let lastTap = 0;
+window.addEventListener('touchend', () => {
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    skyFrozen = !skyFrozen;
+    console.log('skyFrozen:', skyFrozen);
+  }
+  lastTap = now;
+});

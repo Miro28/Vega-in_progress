@@ -270,8 +270,7 @@ function renderSky(observer, time) {
 
 function startScene() {
   scene = new THREE.Scene();
-  // CHANGED: FOV lowered from 75 to 52 to match portrait mobile camera cropping
-  camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 5000);
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
 
   renderer = new THREE.WebGLRenderer({ alpha: true });
   renderer.setClearColor(0x000000, 0);
@@ -311,28 +310,24 @@ function setCameraFromDevice() {
   const beta = rawBeta * deg2rad;
   const gamma = rawGamma * deg2rad;
   const orient = (screen.orientation?.angle || 0) * deg2rad;
-  
-  // 1. Calculate the instantaneous target rotation matrix
+
   tmpEuler.set(beta, alpha, -gamma, 'YXZ');
-  
-  const targetQuat = new THREE.Quaternion();
-  targetQuat.setFromEuler(tmpEuler);
-  targetQuat.multiply(q1);
-  targetQuat.multiply(q0.setFromAxisAngle(zee, -orient));
-  
-  // 2. Use your existing top-level variables to filter out zenith gyro flips
+  camera.quaternion.setFromEuler(tmpEuler);
+  camera.quaternion.multiply(q1);
+  camera.quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
+
+  // smooth jitter by blending toward the new orientation (slerp avoids flips)
   if (!smoothReady) {
-    smoothedQuat.copy(targetQuat);
+    smoothedQuat.copy(camera.quaternion);
     smoothReady = true;
   } else {
-    // Spherical linear interpolation smooths over gimbal lock seamlessly
-    smoothedQuat.slerp(targetQuat, 0.25); 
+    smoothedQuat.slerp(camera.quaternion, 0.2);
+    camera.quaternion.copy(smoothedQuat);
   }
-  
-  // 3. Apply the stable rotation directly to the camera frame
-  camera.quaternion.copy(smoothedQuat);
+
   camera.position.set(0, 0, 0);
 }
+
 
 // ----- Identification -----
 

@@ -316,15 +316,6 @@ function setCameraFromDevice() {
   camera.quaternion.multiply(q1);
   camera.quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
 
-  // smooth jitter by blending toward the new orientation (slerp avoids flips)
-  if (!smoothReady) {
-    smoothedQuat.copy(camera.quaternion);
-    smoothReady = true;
-  } else {
-    smoothedQuat.slerp(camera.quaternion, 0.2);
-    camera.quaternion.copy(smoothedQuat);
-  }
-
   camera.position.set(0, 0, 0);
 }
 

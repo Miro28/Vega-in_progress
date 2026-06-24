@@ -311,7 +311,7 @@ function setCameraFromDevice() {
   const gamma = rawGamma * deg2rad;
   const orient = (screen.orientation?.angle || 0) * deg2rad;
 
-  tmpEuler.set(beta, alpha, -gamma, 'YXZ');
+  tmpEuler.set(-beta, alpha, -gamma, 'YXZ');
   camera.quaternion.setFromEuler(tmpEuler);
   camera.quaternion.multiply(q1);
   camera.quaternion.multiply(q0.setFromAxisAngle(zee, -orient));

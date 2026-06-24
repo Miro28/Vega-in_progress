@@ -596,10 +596,6 @@ function calibrateOnBody(body) {
 function initializeApp() {
   document.getElementById('introOverlay').style.display = 'none';
 
-  if (document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
-
   enableOrientation();
   startCamera();
   findLocation();
@@ -690,48 +686,6 @@ function toggleLines() {
   if (btn) btn.classList.toggle('active', linesVisible);
 }
 
-// Fullscreen with diagnostics. The alert text tells us exactly what the
-// browser does, so we can pinpoint why it's not engaging on this device.
-function toggleFullscreen() {
-  const el = document.documentElement;
-  const fsElement = document.fullscreenElement || document.webkitFullscreenElement;
-  const hasStd = !!el.requestFullscreen;
-  const hasWebkit = !!(el.webkitRequestFullscreen || el.webkitRequestFullScreen);
-
-  if (fsElement) {
-    const exit = document.exitFullscreen || document.webkitExitFullscreen;
-    if (exit) exit.call(document);
-    return;
-  }
-
-  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
-  if (!req) {
-    alert(`No fullscreen API. std:${hasStd} webkit:${hasWebkit}`);
-    return;
-  }
-
-  try {
-    const result = req.call(el);
-    if (result && typeof result.then === 'function') {
-      result
-        .then(() => {
-          // Check whether it actually engaged.
-          const now = document.fullscreenElement || document.webkitFullscreenElement;
-          if (!now) alert('Request resolved but not in fullscreen (browser blocked it).');
-        })
-        .catch(err => alert('Fullscreen rejected: ' + (err?.name || '') + ' ' + (err?.message || err)));
-    } else {
-      // Older API returns nothing; check shortly after.
-      setTimeout(() => {
-        const now = document.fullscreenElement || document.webkitFullscreenElement;
-        if (!now) alert('No-promise fullscreen call did nothing (likely unsupported on this browser).');
-      }, 300);
-    }
-  } catch (err) {
-    alert('Fullscreen threw: ' + (err?.name || '') + ' ' + (err?.message || err));
-  }
-}
-
 // ---- Time scrubbing ----
 const TIME_RANGE_MS = 7 * 24 * 3600 * 1000; // ±7 days
 
@@ -773,7 +727,6 @@ document.getElementById('calBtn').addEventListener('click', () => calibrateOnBod
 document.getElementById('identifyBtn').addEventListener('click', toggleIdentify);
 document.getElementById('linesBtn')?.addEventListener('click', toggleLines);
 document.getElementById('cameraBtn')?.addEventListener('click', toggleCamera);
-document.getElementById('fullscreenBtn')?.addEventListener('click', toggleFullscreen);
 document.getElementById('timeSlider')?.addEventListener('input', onTimeSlider);
 document.getElementById('resetTimeBtn')?.addEventListener('click', resetTime);
 
